@@ -913,16 +913,33 @@
     }
   });
 
-  // Form submission — check required fields explicitly and show a friendly state
+  // Form submission — POST to the Vercel serverless function
   const form = document.getElementById('apply-form');
   const card = document.getElementById('form-card');
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!form.checkValidity()) {
-      form.reportValidity();
-      return;
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        body: new FormData(form),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed (${res.status})`);
+      }
+      card.classList.add('done');
+      window.scrollTo({ top: card.offsetTop - 80, behavior: 'smooth' });
+    } catch (err) {
+      alert('Something went wrong: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = originalText;
     }
-    card.classList.add('done');
-    window.scrollTo({ top: card.offsetTop - 80, behavior: 'smooth' });
   });
 </script>
