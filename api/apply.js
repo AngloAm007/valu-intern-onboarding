@@ -55,10 +55,22 @@ export default async function handler(req, res) {
     .from('cvs')
     .upload(cvPath, cvBuffer, { contentType: cv.mimetype || 'application/octet-stream', upsert: false });
   if (cvErr) {
-    console.error('CV upload error:', cvErr, 'path:', cvPath, 'urlHost:', new URL(SUPABASE_URL).host);
+    const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
+    console.error(
+      'CV upload error:', cvErr,
+      'path:', cvPath,
+      'urlHost:', new URL(SUPABASE_URL).host,
+      'buckets visible to this key:', buckets?.map(b => b.name) || `LIST FAILED: ${listErr?.message}`
+    );
     return res.status(500).json({
       error: `CV upload failed: ${cvErr.message}`,
-      debug: { path: cvPath, statusCode: cvErr.statusCode, hint: cvErr.hint }
+      debug: {
+        path: cvPath,
+        statusCode: cvErr.statusCode,
+        urlHost: new URL(SUPABASE_URL).host,
+        buckets: buckets?.map(b => b.name) || null,
+        listError: listErr?.message || null,
+      }
     });
   }
 
