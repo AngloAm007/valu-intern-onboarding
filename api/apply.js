@@ -16,7 +16,12 @@ export default async function handler(req, res) {
 
   let fields, files;
   try {
-    const form = formidable({ maxFileSize: 20 * 1024 * 1024, multiples: true });
+    const form = formidable({
+      maxFileSize: 20 * 1024 * 1024,
+      multiples: true,
+      allowEmptyFiles: true,
+      minFileSize: 0,
+    });
     [fields, files] = await form.parse(req);
   } catch (err) {
     return res.status(400).json({ error: `Could not parse form: ${err.message}` });
@@ -28,9 +33,10 @@ export default async function handler(req, res) {
   const video_url  = pick(fields.video);
   const projects   = pick(fields.projects) || null;
   const cv         = pick(files.cv);
-  const projectFiles = files.project_files
+  const projectFiles = (files.project_files
     ? (Array.isArray(files.project_files) ? files.project_files : [files.project_files])
-    : [];
+    : []
+  ).filter((f) => f && f.size > 0);
 
   if (!name || !email || !position || !video_url || !cv) {
     return res.status(400).json({ error: 'Missing required fields' });
