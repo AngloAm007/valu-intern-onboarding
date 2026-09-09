@@ -96,5 +96,102 @@ export default async function handler(req, res) {
   });
   if (dbErr) return res.status(500).json({ error: `DB insert failed: ${dbErr.message}` });
 
+  // Send confirmation email — best-effort, never fails the request
+  try {
+    await sendConfirmationEmail({ name, email, position });
+  } catch (err) {
+    console.error('confirmation email failed:', err);
+  }
+
   return res.status(200).json({ ok: true });
+}
+
+async function sendConfirmationEmail({ name, email, position }) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return; // email disabled
+
+  const from = process.env.EMAIL_FROM || 'Valu Internships <onboarding@resend.dev>';
+  const firstName = (name || '').trim().split(/\s+/)[0] || 'there';
+  const positionLabel = {
+    coding: 'the Coding Internship',
+    design: 'the UX/UI Design Internship',
+    both: 'both internship tracks',
+  }[position] || 'a Valu internship';
+
+  const subject = `We've got your Valu application, ${firstName}`;
+
+  const text = `Hi ${firstName},
+
+Thanks for applying to ${positionLabel} at Valu — we've received your application and it's in our queue.
+
+What happens next:
+- We read every submission personally
+- You'll hear back from us within two weeks, either way
+- If we want to talk further, we'll email you to set up a short call
+
+If anything's changed on your end (a new project link, a corrected CV), just reply to this email and we'll append it to your application.
+
+Excited to meet you.
+
+— The Valu Team
+`;
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#F5FBFC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1A1F24;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5FBFC;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:20px;border:1px solid #E6ECEE;overflow:hidden;">
+        <tr><td style="padding:36px 40px 8px;">
+          <div style="font-size:14px;color:#0A8FA6;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">Valu Internships</div>
+        </td></tr>
+        <tr><td style="padding:8px 40px 24px;">
+          <h1 style="font-size:26px;line-height:1.15;letter-spacing:-0.02em;margin:0 0 12px;font-weight:700;">We've got it, ${escapeHtml(firstName)}.</h1>
+          <p style="margin:0;color:#4A555C;font-size:16px;line-height:1.55;">
+            Thanks for applying to <strong style="color:#1A1F24;">${escapeHtml(positionLabel)}</strong> at Valu. Your application is in our queue and we'll be in touch within two weeks — either way.
+          </p>
+        </td></tr>
+        <tr><td style="padding:0 40px 24px;">
+          <div style="background:#E4F6F9;border-left:3px solid #21BDD5;border-radius:0 12px 12px 0;padding:16px 20px;">
+            <div style="font-size:12px;color:#0A8FA6;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">What happens next</div>
+            <ul style="margin:0;padding-left:18px;color:#1A1F24;font-size:14.5px;line-height:1.55;">
+              <li>We read every submission personally.</li>
+              <li>You'll hear from us within two weeks.</li>
+              <li>If we want to talk further, we'll email to set up a short call.</li>
+            </ul>
+          </div>
+        </td></tr>
+        <tr><td style="padding:0 40px 32px;">
+          <p style="margin:0;color:#4A555C;font-size:14px;line-height:1.55;">
+            Anything changed on your end — a new project link, a corrected CV? Just reply to this email and we'll append it to your application.
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px;border-top:1px solid #E6ECEE;background:#F5FBFC;">
+          <p style="margin:0;color:#8A9399;font-size:12px;line-height:1.5;">
+            Excited to meet you.<br>— The Valu Team
+          </p>
+        </td></tr>
+      </table>
+      <div style="color:#8A9399;font-size:11px;margin-top:16px;">Valu · Own your identity, freedom, and security.</div>
+    </td></tr>
+  </table>
+</body></html>`;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: email, subject, text, html }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Resend ${res.status}: ${body}`);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
