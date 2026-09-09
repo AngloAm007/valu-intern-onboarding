@@ -4,10 +4,10 @@ import fs from 'node:fs';
 
 export const config = { api: { bodyParser: false } };
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-);
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+const SUPABASE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const pick = (v) => (Array.isArray(v) ? v[0] : v);
 
@@ -54,7 +54,13 @@ export default async function handler(req, res) {
   const { error: cvErr } = await supabase.storage
     .from('cvs')
     .upload(cvPath, cvBuffer, { contentType: cv.mimetype || 'application/octet-stream', upsert: false });
-  if (cvErr) return res.status(500).json({ error: `CV upload failed: ${cvErr.message}` });
+  if (cvErr) {
+    console.error('CV upload error:', cvErr, 'path:', cvPath, 'urlHost:', new URL(SUPABASE_URL).host);
+    return res.status(500).json({
+      error: `CV upload failed: ${cvErr.message}`,
+      debug: { path: cvPath, statusCode: cvErr.statusCode, hint: cvErr.hint }
+    });
+  }
 
   const projectPaths = [];
   for (const [i, f] of projectFiles.entries()) {
