@@ -43,22 +43,26 @@ export default async function handler(req, res) {
   }
 
   const stamp = Date.now();
-  const safe = (s) => s.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const rand = Math.random().toString(36).slice(2, 8);
+  const ext = (name) => {
+    const m = /\.([a-zA-Z0-9]{1,8})$/.exec(name || '');
+    return m ? m[1].toLowerCase() : 'bin';
+  };
 
-  const cvPath = `${stamp}/${safe(cv.originalFilename || 'cv')}`;
+  const cvPath = `${stamp}-${rand}/cv.${ext(cv.originalFilename)}`;
   const cvBuffer = fs.readFileSync(cv.filepath);
   const { error: cvErr } = await supabase.storage
     .from('cvs')
-    .upload(cvPath, cvBuffer, { contentType: cv.mimetype, upsert: false });
+    .upload(cvPath, cvBuffer, { contentType: cv.mimetype || 'application/octet-stream', upsert: false });
   if (cvErr) return res.status(500).json({ error: `CV upload failed: ${cvErr.message}` });
 
   const projectPaths = [];
   for (const [i, f] of projectFiles.entries()) {
-    const path = `${stamp}/projects/${i}-${safe(f.originalFilename || 'file')}`;
+    const path = `${stamp}-${rand}/project-${i}.${ext(f.originalFilename)}`;
     const buf = fs.readFileSync(f.filepath);
     const { error } = await supabase.storage
       .from('cvs')
-      .upload(path, buf, { contentType: f.mimetype, upsert: false });
+      .upload(path, buf, { contentType: f.mimetype || 'application/octet-stream', upsert: false });
     if (error) return res.status(500).json({ error: `Project file upload failed: ${error.message}` });
     projectPaths.push(path);
   }
