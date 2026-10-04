@@ -110,7 +110,17 @@ export default async function handler(req, res) {
 async function sendConfirmationEmail({ name, email, position }) {
   const gmailUser = process.env.GMAIL_USER;
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
-  if (!gmailUser || !gmailPass) return; // email disabled
+  console.log('email env check:', {
+    hasUser: !!gmailUser,
+    userLen: gmailUser?.length || 0,
+    hasPass: !!gmailPass,
+    passLen: gmailPass?.length || 0,
+    sendingTo: email,
+  });
+  if (!gmailUser || !gmailPass) {
+    console.warn('email skipped: GMAIL_USER or GMAIL_APP_PASSWORD not set in this environment');
+    return;
+  }
 
   const from = process.env.EMAIL_FROM || `Valu Internships <${gmailUser}>`;
   const firstName = (name || '').trim().split(/\s+/)[0] || 'there';
