@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import formidable from 'formidable';
 import fs from 'node:fs';
+import nodemailer from 'nodemailer';
 
 export const config = { api: { bodyParser: false } };
 
@@ -107,10 +108,11 @@ export default async function handler(req, res) {
 }
 
 async function sendConfirmationEmail({ name, email, position }) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return; // email disabled
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (!gmailUser || !gmailPass) return; // email disabled
 
-  const from = process.env.EMAIL_FROM || 'Valu Internships <onboarding@resend.dev>';
+  const from = process.env.EMAIL_FROM || `Valu Internships <${gmailUser}>`;
   const firstName = (name || '').trim().split(/\s+/)[0] || 'there';
   const positionLabel = {
     coding: 'the Coding Internship',
@@ -176,18 +178,14 @@ Excited to meet you.
   </table>
 </body></html>`;
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from, to: email, subject, text, html }),
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: { user: gmailUser, pass: gmailPass },
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Resend ${res.status}: ${body}`);
-  }
+
+  await transporter.sendMail({ from, to: email, subject, text, html });
 }
 
 function escapeHtml(s) {
